@@ -9,6 +9,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Canvas } from '@react-three/fiber';
 import { Suspense, useEffect, useState } from 'react';
+import * as THREE from 'three';
 
 interface MiniCentrifugeProps {
   speed: number;
@@ -157,7 +158,7 @@ export const EquipmentPanel = () => {
             <span className="font-tech text-warn-orange">{Math.round(current.rotationSpeed)}rpm</span>
           </div>
           <div className="h-44">
-            <MiniCentrifuge3D speed={current.rotationSpeed} />
+            <MiniCentrifuge3D key={current.id} speed={current.rotationSpeed} />
           </div>
         </div>
 

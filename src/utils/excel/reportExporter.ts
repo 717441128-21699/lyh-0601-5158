@@ -104,7 +104,8 @@ export const exportReportToExcel = (report: QuarterlyReport): Blob => {
   XLSX.utils.book_append_sheet(wb, ws3, '各厂数据');
 
   // Sheet 4: 指标对比
-  const compareHeader = ['指标', '1月', '2月', '3月', '季度平均'];
+  const months = report.monthlyBreakdown.map((m) => m.month);
+  const compareHeader = ['指标', ...months, '季度平均'];
   const effRow = report.monthlyBreakdown.map((m) => (m.processingEfficiency * 100).toFixed(2) + '%');
   const utilRow = report.monthlyBreakdown.map((m) => (m.resourceUtilization * 100).toFixed(2) + '%');
   const dredgeRow = report.monthlyBreakdown.map((m) => m.dredgeVolume);
@@ -114,7 +115,7 @@ export const exportReportToExcel = (report: QuarterlyReport): Blob => {
     ['处理效率', ...effRow, (report.avgProcessingEfficiency * 100).toFixed(2) + '%'],
     ['资源化利用率', ...utilRow, (report.avgResourceUtilization * 100).toFixed(2) + '%'],
   ]);
-  ws4['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
+  ws4['!cols'] = [{ wch: 20 }, ...months.map(() => ({ wch: 15 })), { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, ws4, '指标对比');
 
   const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });

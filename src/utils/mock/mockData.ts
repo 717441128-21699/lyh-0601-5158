@@ -290,6 +290,7 @@ export const generateMockTrucks = (): TransportTruck[] => [
     ],
     estimatedArrival: Date.now() + 3600_000 * 0.3,
     waitTime: 0,
+    queuePosition: 0,
     pathProgress: 0.4,
   },
   {
@@ -310,6 +311,7 @@ export const generateMockTrucks = (): TransportTruck[] => [
     ],
     estimatedArrival: Date.now() + 3600_000 * 0.15,
     waitTime: 0,
+    queuePosition: 0,
     pathProgress: 0.7,
   },
   {
@@ -332,6 +334,7 @@ export const generateMockTrucks = (): TransportTruck[] => [
     ],
     estimatedArrival: Date.now(),
     waitTime: 3600_000 * 0.25,
+    queuePosition: 1,
     pathProgress: 0.95,
   },
   {
@@ -352,6 +355,7 @@ export const generateMockTrucks = (): TransportTruck[] => [
     ],
     estimatedArrival: Date.now() - 3600_000 * 0.1,
     waitTime: 0,
+    queuePosition: 0,
     pathProgress: 1,
   },
   {
@@ -374,6 +378,7 @@ export const generateMockTrucks = (): TransportTruck[] => [
     ],
     estimatedArrival: Date.now() + 3600_000 * 0.5,
     waitTime: 0,
+    queuePosition: 0,
     pathProgress: 0.35,
   },
 ];

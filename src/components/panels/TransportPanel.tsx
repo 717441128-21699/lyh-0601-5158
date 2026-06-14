@@ -99,7 +99,7 @@ export const TransportPanel = () => {
                 {queueByPlant[p.id]?.slice(0, 2).map((t) => (
                   <div key={t.id} className="text-[9px] text-text-secondary flex justify-between">
                     <span>{t.plateNo.slice(-4)}</span>
-                    <span className="text-warn-orange">★{t.priority}</span>
+                    <span className="text-warn-orange">#{t.queuePosition} ★{t.priority}</span>
                   </div>
                 ))}
                 {(queueByPlant[p.id]?.length || 0) > 2 && (
@@ -151,8 +151,18 @@ export const TransportPanel = () => {
                       {plantNameMap[t.targetPlantId] || '—'}厂
                     </span>
                     <span className="flex items-center gap-1 text-text-secondary">
-                      {t.status === 'queuing' ? <Timer className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                      {eta || '—'}
+                      {t.status === 'queuing' ? (
+                        <>
+                          <Timer className="w-3 h-3" />
+                          <span className="text-warn-orange font-semibold">#{t.queuePosition} 队列</span>
+                          <span>{eta || '—'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-3 h-3" />
+                          {eta || '—'}
+                        </>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">

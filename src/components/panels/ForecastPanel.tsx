@@ -2,6 +2,7 @@ import { LineChart, Cloud, Sun, CloudRain, CloudLightning, CheckCircle2, XCircle
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useAppStore } from '@/stores/useAppStore';
 import { NeonButton } from '@/components/ui/NeonButton';
+import { usePermission } from '@/hooks/usePermission';
 import { useState, useMemo } from 'react';
 import EChartsReact from 'echarts-for-react';
 import { clsx } from 'clsx';
@@ -69,17 +70,25 @@ export const ForecastPanel = () => {
 
   const canApprove = useMemo(() => {
     if (!plan || !currentUser) return { step: 0 as 0 | 1 | 2 | 3, can: false };
-    const stepMap: Record<string, 0 | 1 | 2 | 3> = { river_chief: 1, administrator: 2 };
-    // 简化：河长=河道局审批(step1)，管理局可以做环保局(2)和资源企业(3)
-    if (currentUser.role === 'operator') return { step: 0, can: false };
-    // 按当前approvalStep决定下一个
-    const nextStep = plan.approvalStep + 1;
-    if (plan.approvalStep >= 3) return { step: nextStep as any, can: false };
-    if (currentUser.role === 'river_chief' && plan.approvalStep < 1) return { step: 1, can: true };
-    if (currentUser.role === 'administrator' && plan.approvalStep >= 1 && plan.approvalStep < 3) {
-      return { step: (plan.approvalStep + 1) as 1 | 2 | 3, can: true };
+    // 严格逐级推进：approvalStep 0→1→2→3
+    // 0→1: 河道局 (河长/管理局)
+    // 1→2: 环保局 (仅管理局)
+    // 2→3: 资源化企业 (仅管理局)
+    if (plan.approvalStep >= 3) return { step: 3 as const, can: false };
+    const nextStep = (plan.approvalStep + 1) as 1 | 2 | 3;
+    if (plan.status === 'rejected') return { step: nextStep, can: false };
+    if (nextStep === 1) {
+      // 河道局审批：河长或管理局
+      if (currentUser.role === 'river_chief' || currentUser.role === 'administrator') {
+        return { step: 1, can: true };
+      }
+    } else if (nextStep === 2 || nextStep === 3) {
+      // 环保局/资源化企业：仅管理局
+      if (currentUser.role === 'administrator') {
+        return { step: nextStep, can: true };
+      }
     }
-    return { step: nextStep as any, can: false };
+    return { step: nextStep, can: false };
   }, [plan, currentUser]);
 
   const steps = [
@@ -305,6 +314,3 @@ export const ForecastPanel = () => {
 };
 
 export default ForecastPanel;
-
-// helper
-import { usePermission } from '@/hooks/usePermission';

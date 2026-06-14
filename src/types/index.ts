@@ -105,6 +105,7 @@ export interface TransportTruck {
   routePath: [number, number, number][];
   estimatedArrival: number;
   waitTime: number;
+  queuePosition: number;
   pathProgress?: number;
 }
 

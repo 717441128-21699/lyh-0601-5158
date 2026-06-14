@@ -89,6 +89,42 @@ const lerpPos = (
   t: number
 ): [number, number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
+const generateTruckRoute = (
+  from: [number, number, number],
+  to: [number, number, number]
+): [number, number, number][] => {
+  const midX = (from[0] + to[0]) / 2 + (Math.random() - 0.5) * 4;
+  const midZ = (from[2] + to[2]) / 2 + (Math.random() - 0.5) * 4;
+  return [
+    from,
+    [midX, 0.5, from[2]],
+    [midX, 0.5, midZ],
+    [to[0], 0.5, midZ],
+    to,
+  ];
+};
+
+const findOptimalPlant = (
+  plants: TreatmentPlant[],
+  truck: TransportTruck,
+  allTrucks: TransportTruck[]
+): TreatmentPlant => {
+  const scored = plants.map((p) => {
+    const loadScore = 1 - p.processingLoad / 100;
+    const remainingInv = Math.max(0, p.maxInventory - p.inventory);
+    const invScore = remainingInv / Math.max(1, p.maxInventory);
+    const priorityScore = truck.priority / 5;
+    const queuingCount = allTrucks.filter(
+      (t) => t.targetPlantId === p.id && (t.status === 'queuing' || t.status === 'unloading')
+    ).length;
+    const queuePenalty = queuingCount * 0.1;
+    const score = loadScore * 0.4 + invScore * 0.4 + priorityScore * 0.2 - queuePenalty;
+    return { plant: p, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].plant;
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -167,7 +203,25 @@ export const useAppStore = create<AppState>()(
           return { ships, berths, logs };
         }),
 
-      dispatchTruck: (_truckId, _plantId) => set((s) => ({ ...s })),
+      dispatchTruck: (truckId, plantId) =>
+        set((state) => {
+          const plants = state.plants;
+          const targetPlant = plants.find((p) => p.id === plantId) || plants[0];
+          const trucks = state.trucks.map((t) => {
+            if (t.id !== truckId) return t;
+            const route = generateTruckRoute(t.position, targetPlant.position);
+            return {
+              ...t,
+              status: 'transporting' as const,
+              targetPlantId: plantId,
+              routePath: route,
+              pathProgress: 0,
+              estimatedArrival: Date.now() + 120_000,
+              waitTime: 0,
+            };
+          });
+          return { trucks };
+        }),
 
       adjustCentrifugeSpeed: (id, newSpeed, reason = '手动调整') =>
         set((state) => {
@@ -196,22 +250,48 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const plans = state.plans.map((p) => {
             if (p.id !== planId) return p;
-            const nextStep: 0 | 1 | 2 | 3 = pass ? ((step + 1) as 0 | 1 | 2 | 3) : ((Math.max(0, step - 1)) as 0 | 1 | 2 | 3);
+            // 严格校验：当前approvalStep必须等于step-1才能审批
+            if (p.approvalStep !== step - 1) return p;
+            // 每点一次通过，approvalStep只+1，驳回则不改变step
+            const newApprovalStep: 0 | 1 | 2 | 3 = pass
+              ? (step as 0 | 1 | 2 | 3)
+              : (p.approvalStep as 0 | 1 | 2 | 3);
             const approvalStatus: ApprovalStatus = pass ? 'approved' : 'rejected';
             const approver = state.currentUser?.name || '审批人';
             const now = Date.now();
-            const update = {
-              approvalStep: nextStep,
-              status: (pass && nextStep === 3 ? 'approved' : pass ? 'approving' : 'rejected') as SchedulePlan['status'],
+
+            const baseUpdate = {
+              approvalStep: newApprovalStep,
+              status: (pass
+                ? newApprovalStep === 3
+                  ? 'approved'
+                  : 'approving'
+                : 'rejected') as SchedulePlan['status'],
+              executionProgress: 0,
             };
+
+            let update: Partial<SchedulePlan> = { ...baseUpdate };
+
             if (step === 1) {
-              return { ...p, ...update, riverBureauApproval: { status: approvalStatus, approver, comment, approvedAt: now } };
+              update = {
+                ...update,
+                riverBureauApproval: { status: approvalStatus, approver, comment, approvedAt: now },
+              };
             } else if (step === 2) {
-              return { ...p, ...update, envBureauApproval: { status: approvalStatus, approver, comment, approvedAt: now } };
+              update = {
+                ...update,
+                envBureauApproval: { status: approvalStatus, approver, comment, approvedAt: now },
+              };
             } else if (step === 3) {
-              return { ...p, ...update, resourceEnterpriseApproval: { status: approvalStatus, approver, comment, approvedAt: now } };
+              update = {
+                ...update,
+                resourceEnterpriseApproval: { status: approvalStatus, approver, comment, approvedAt: now },
+                // 三级审批全部通过后自动开始执行
+                status: pass ? 'executing' : 'rejected',
+                executionProgress: 0,
+              };
             }
-            return p;
+            return { ...p, ...update };
           });
           const logs = addLogEntry(
             state.logs,
@@ -346,7 +426,7 @@ export const useAppStore = create<AppState>()(
           });
 
           // 运输车模拟
-          const trucks = state.trucks.map((t) => {
+          let trucks = state.trucks.map((t) => {
             let truck = { ...t };
             if (truck.status === 'transporting' && truck.routePath.length > 1) {
               const path = truck.routePath;
@@ -358,21 +438,41 @@ export const useAppStore = create<AppState>()(
               truck.position = lerpPos(path[segIdx], path[segIdx + 1], segT);
 
               if (truck.pathProgress >= 0.98) {
-                // 检查目标厂排队情况
-                const queuingForPlant = state.trucks.filter(
-                  (ot) => ot.targetPlantId === truck.targetPlantId && (ot.status === 'queuing' || ot.status === 'unloading')
-                ).length;
-                if (queuingForPlant > 0 && truck.priority < 3) {
+                // 到达目标厂，按优先级排队
+                const allArrived = state.trucks.filter(
+                  (ot) =>
+                    ot.targetPlantId === truck.targetPlantId &&
+                    (ot.status === 'queuing' || ot.status === 'unloading')
+                );
+                // 按优先级降序排序，高优先级在前
+                const queue = [...allArrived, truck].sort((a, b) => b.priority - a.priority);
+                const position = queue.findIndex((q) => q.id === truck.id);
+                if (position > 0) {
                   truck.status = 'queuing';
-                  truck.waitTime = queuingForPlant * 300_000;
+                  truck.queuePosition = position;
+                  truck.waitTime = position * 180_000; // 每台等待3分钟
                 } else {
                   truck.status = 'unloading';
+                  truck.queuePosition = 0;
+                  truck.waitTime = 0;
                 }
               }
             } else if (truck.status === 'queuing') {
               truck.waitTime = Math.max(0, truck.waitTime - deltaMs);
-              if (truck.waitTime <= 0) {
+              // 检查前面是否有车卸完，更新排队位置
+              const plantTrucks = state.trucks.filter(
+                (ot) =>
+                  ot.targetPlantId === truck.targetPlantId &&
+                  (ot.status === 'queuing' || ot.status === 'unloading')
+              );
+              const queue = [...plantTrucks].sort((a, b) => b.priority - a.priority || a.waitTime - b.waitTime);
+              const newPos = queue.findIndex((q) => q.id === truck.id);
+              truck.queuePosition = newPos;
+              if (newPos === 0) {
                 truck.status = 'unloading';
+                truck.waitTime = 0;
+              } else {
+                truck.waitTime = newPos * 180_000; // 重新计算等待时间
               }
             } else if (truck.status === 'unloading') {
               const dec = 0.3 * speedFactor;
@@ -394,32 +494,55 @@ export const useAppStore = create<AppState>()(
               truck.position = lerpPos(path[segIdx], path[segIdx + 1], segT);
               if (truck.pathProgress >= 1) {
                 truck.status = 'loading';
-                truck.loadWeight = truck.maxLoad;
-                setTimeout(() => {
-                  const plants = get().plants;
-                  const sorted = [...plants].sort(
-                    (a, b) => a.processingLoad / a.maxLoad - b.processingLoad / b.maxLoad
-                  );
-                  const target = sorted[0];
-                  set((s2) => ({
-                    trucks: s2.trucks.map((tt) =>
-                      tt.id === truck.id
-                        ? {
-                            ...tt,
-                            status: 'transporting',
-                            targetPlantId: target.id,
-                            pathProgress: 0,
-                            routePath: [...tt.routePath].reverse(),
-                          }
-                        : tt
-                    ),
-                  }));
-                }, 2000);
+                truck.loadWeight = 0;
               }
             } else if (truck.status === 'loading') {
-              // 等待装货
+              // 装货
+              const inc = 0.25 * speedFactor;
+              truck.loadWeight = Math.min(truck.maxLoad, truck.loadWeight + inc);
+              if (truck.loadWeight >= truck.maxLoad) {
+                // 装货完成，重新分配最优目标厂
+                const currentState = get();
+                const target = findOptimalPlant(currentState.plants, truck, currentState.trucks);
+                const newRoute = generateTruckRoute(truck.position, target.position);
+                truck.status = 'transporting';
+                truck.targetPlantId = target.id;
+                truck.routePath = newRoute;
+                truck.pathProgress = 0;
+                truck.estimatedArrival = Date.now() + 120_000;
+                truck.queuePosition = 0;
+                truck.waitTime = 0;
+              }
             }
             return truck;
+          });
+
+          // 重新同步所有厂的排队顺序和等待时间
+          const allPlants = state.plants;
+          allPlants.forEach((p) => {
+            const plantTrucks = trucks.filter(
+              (t) => t.targetPlantId === p.id && (t.status === 'queuing' || t.status === 'unloading')
+            );
+            if (plantTrucks.length > 0) {
+              const sorted = [...plantTrucks].sort((a, b) => b.priority - a.priority);
+              sorted.forEach((pt, idx) => {
+                const truckRef = trucks.find((t) => t.id === pt.id);
+                if (truckRef) {
+                  truckRef.queuePosition = idx;
+                  if (idx === 0) {
+                    if (truckRef.status === 'queuing') {
+                      truckRef.status = 'unloading';
+                      truckRef.waitTime = 0;
+                    }
+                  } else {
+                    if (truckRef.status === 'unloading' && idx > 0) {
+                      truckRef.status = 'queuing';
+                    }
+                    truckRef.waitTime = Math.max(truckRef.waitTime, idx * 180_000);
+                  }
+                }
+              });
+            }
           });
 
           // 离心机模拟
@@ -452,7 +575,7 @@ export const useAppStore = create<AppState>()(
           });
 
           // 处理厂负荷更新
-          const plants = state.plants.map((p) => {
+          const updatedPlants = state.plants.map((p) => {
             const plantCents = centrifuges.filter((c) => c.plantId === p.id);
             const avgLoad = plantCents.reduce((s, c) => s + c.rotationSpeed / 3500, 0) / Math.max(1, plantCents.length);
             const newInv = Math.max(
@@ -488,7 +611,7 @@ export const useAppStore = create<AppState>()(
             return { ...p, executionProgress: Math.min(100, p.executionProgress + 0.001 * speedFactor) };
           });
 
-          return { ships, berths, trucks, centrifuges, plants, inventories, plans, alertCount: newAlertCount };
+          return { ships, berths, trucks, centrifuges, plants: updatedPlants, inventories, plans, alertCount: newAlertCount };
         });
       },
     }),
