@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background-color: #0A1628;
+  color: #E8F4FF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl shadow-glass;
+  }
+
+  .neon-btn {
+    @apply relative px-6 py-2.5 rounded-lg font-medium transition-all duration-300 overflow-hidden;
+    @apply bg-gradient-to-r from-ocean-mid to-ocean-light border border-tech-cyan/30;
+    @apply hover:shadow-neon-cyan hover:border-tech-cyan/60;
+    @apply active:scale-95;
+  }
+
+  .neon-btn-primary {
+    @apply neon-btn;
+    @apply text-tech-cyan;
+  }
+
+  .neon-btn-success {
+    @apply neon-btn;
+    @apply text-eco-green border-eco-green/30 hover:shadow-neon-green hover:border-eco-green/60;
+  }
+
+  .neon-btn-warning {
+    @apply neon-btn;
+    @apply text-warn-orange border-warn-orange/30 hover:shadow-neon-gold hover:border-warn-orange/60;
+  }
+
+  .neon-btn-danger {
+    @apply neon-btn;
+    @apply text-danger-red border-danger-red/30 hover:shadow-neon-red hover:border-danger-red/60;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-cyan {
+    @apply badge bg-tech-cyan/15 text-tech-cyan border border-tech-cyan/30;
+  }
+
+  .badge-green {
+    @apply badge bg-eco-green/15 text-eco-green border border-eco-green/30;
+  }
+
+  .badge-orange {
+    @apply badge bg-warn-orange/15 text-warn-orange border border-warn-orange/30;
+  }
+
+  .badge-red {
+    @apply badge bg-danger-red/15 text-danger-red border border-danger-red/30;
+  }
+
+  .badge-gold {
+    @apply badge bg-approval-gold/15 text-approval-gold border border-approval-gold/30;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-lg;
+    @apply bg-ocean-dark/60 border border-glass-border text-text-primary;
+    @apply focus:outline-none focus:border-tech-cyan/60 focus:shadow-neon-cyan;
+    @apply placeholder-text-muted;
+    @apply transition-all duration-200;
+  }
+
+  .section-title {
+    @apply flex items-center gap-2 text-lg font-semibold text-text-primary mb-4;
+  }
+
+  .section-title::before {
+    content: '';
+    @apply w-1 h-5 rounded bg-tech-cyan;
+  }
+
+  .tech-number {
+    @apply font-tech font-semibold tracking-wider;
+  }
+
+  .hud-corner {
+    position: relative;
+  }
+
+  .hud-corner::before,
+  .hud-corner::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-color: #00D4FF;
+    border-style: solid;
+    border-width: 0;
+  }
+
+  .hud-corner::before {
+    top: -1px;
+    left: -1px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-top-left-radius: 4px;
+  }
+
+  .hud-corner::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-bottom-right-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(26, 45, 74, 0.5);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.4);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.6);
+  }
+
+  .flow-line {
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      currentColor 25%, 
+      currentColor 50%, 
+      currentColor 75%, 
+      transparent 100%);
+    background-size: 200% 100%;
+    animation: flow 1.5s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-gradient-cyan {
+    background: linear-gradient(135deg, #00D4FF, #4DE8FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #FFD700, #FFE44D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-grid-overlay {
+    background-image: 
+      linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .radial-glow {
+    background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
+  }
+}
